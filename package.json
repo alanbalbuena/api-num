@@ -1,0 +1,35 @@
+{
+  "name": "api-num",
+  "version": "1.0.0",
+  "description": "API REST con Node.js y Express",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "encrypt-passwords": "node src/scripts/encrypt-passwords.js",
+    "cleanup-tokens": "node src/scripts/cleanup-tokens.js"
+  },
+  "keywords": [
+    "api",
+    "node",
+    "express",
+    "rest"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

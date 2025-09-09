@@ -9,12 +9,17 @@ router.use(authenticateToken);
 
 // Rutas para operaciones
 router.get('/', operacionController.getAllOperaciones);
+router.get('/estatus/:estatus', operacionController.getOperacionesByEstatus);
+router.get('/pendientes', operacionController.getOperacionesPendientes);
+router.get('/previa', operacionController.getOperacionesPrevia);
+router.get('/facturadas', operacionController.getOperacionesFacturadas);
 router.get('/sin-pagos', operacionController.getOperacionesSinPagos);
 router.get('/con-pagos-parciales', operacionController.getOperacionesConPagosParciales);
 router.get('/completamente-pagadas', operacionController.getOperacionesCompletamentePagadas);
 router.get('/no-completamente-pagadas', operacionController.getOperacionesNoCompletamentePagadas);
 router.get('/no-completamente-pagadas/empresa/:empresaId', operacionController.getOperacionesNoCompletamentePagadas);
 router.get('/:id', operacionController.getOperacionById);
+router.get('/:id/conceptos', operacionController.getOperacionByIdWithConceptos);
 router.get('/:id/estadisticas-pagos', operacionController.getEstadisticasPagos);
 
 // Rutas para crear y actualizar operaciones (con soporte para imágenes)

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS operaciones (
   folio_factura VARCHAR(10) NULL,
   referencia VARCHAR(100) NULL,
   saldo DECIMAL(10,2) DEFAULT 0.00,
+  estatus ENUM('PENDIENTE', 'PREVIA', 'FACTURADA') DEFAULT 'PENDIENTE',
 
   CONSTRAINT fk_id_cliente FOREIGN KEY (id_cliente) REFERENCES cliente(id),
   CONSTRAINT fk_id_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id),

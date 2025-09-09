@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const ConceptosFactura = require('./conceptosFactura.model');
 
 class Operacion {
   // Obtener todas las operaciones
@@ -49,6 +50,34 @@ class Operacion {
     }
   }
 
+  // Obtener una operación por ID con sus conceptos de factura y razón social
+  static async findByIdWithConceptos(id) {
+    try {
+      const operacion = await this.findById(id);
+      if (!operacion) {
+        return null;
+      }
+      
+      const conceptos = await ConceptosFactura.findByOperacion(id);
+      
+      // Obtener información de razón social
+      const [razonSocialRows] = await db.query(`
+        SELECT * FROM razon_social 
+        WHERE id_cliente = ?
+      `, [operacion.id_cliente]);
+      
+      const razonSocial = razonSocialRows.length > 0 ? razonSocialRows[0] : null;
+      
+      return {
+        ...operacion,
+        conceptos_factura: conceptos,
+        razon_social: razonSocial
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Crear una nueva operación
   static async create(operacionData) {
     const {
@@ -68,7 +97,8 @@ class Operacion {
       folio_factura,
       referencia,
       costo,
-      imagen_url
+      imagen_url,
+      estatus
     } = operacionData;
     try {
       const [result] = await db.query(
@@ -89,8 +119,9 @@ class Operacion {
           folio_factura,
           referencia,
           costo,
-          imagen_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          imagen_url,
+          estatus
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           numero_operacion,
           id_cliente,
@@ -108,7 +139,8 @@ class Operacion {
           folio_factura,
           referencia,
           costo,
-          imagen_url
+          imagen_url,
+          estatus || 'PENDIENTE'
         ]
       );
       // El trigger se encarga de calcular el saldo automáticamente
@@ -214,6 +246,11 @@ class Operacion {
         valores.push(operacionData.imagen_url);
       }
       
+      if (operacionData.estatus !== undefined) {
+        camposAActualizar.push('estatus = ?');
+        valores.push(operacionData.estatus);
+      }
+      
       // Si no hay campos para actualizar, retornar false
       if (camposAActualizar.length === 0) {
         return false;
@@ -240,6 +277,46 @@ class Operacion {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Obtener operaciones por estatus
+  static async findByEstatus(estatus) {
+    try {
+      const [rows] = await db.query(`
+        SELECT o.*, 
+               c.nombre as nombre_cliente,
+               e.nombre as nombre_empresa,
+               b1.nombre as nombre_broker1,
+               b2.nombre as nombre_broker2,
+               b3.nombre as nombre_broker3
+        FROM operaciones o
+        LEFT JOIN cliente c ON o.id_cliente = c.id
+        LEFT JOIN empresa e ON o.id_empresa = e.id
+        LEFT JOIN broker b1 ON o.id_broker1 = b1.id
+        LEFT JOIN broker b2 ON o.id_broker2 = b2.id
+        LEFT JOIN broker b3 ON o.id_broker3 = b3.id
+        WHERE o.estatus = ?
+        ORDER BY o.id DESC
+      `, [estatus]);
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Obtener operaciones pendientes
+  static async findPendientes() {
+    return this.findByEstatus('PENDIENTE');
+  }
+
+  // Obtener operaciones previa
+  static async findPrevia() {
+    return this.findByEstatus('PREVIA');
+  }
+
+  // Obtener operaciones facturadas
+  static async findFacturadas() {
+    return this.findByEstatus('FACTURADA');
   }
 
   // Obtener operaciones sin pagos aplicados

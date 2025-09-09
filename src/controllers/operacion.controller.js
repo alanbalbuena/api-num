@@ -1,4 +1,71 @@
 const Operacion = require('../models/operacion.model');
+const ConceptosFactura = require('../models/conceptosFactura.model');
+
+// Obtener operaciones por estatus
+exports.getOperacionesByEstatus = async (req, res) => {
+  try {
+    const { estatus } = req.params;
+    
+    // Validar que el estatus sea válido
+    if (!['PENDIENTE', 'PREVIA', 'FACTURADA'].includes(estatus)) {
+      return res.status(400).json({
+        error: 'Estatus inválido',
+        message: 'El estatus debe ser uno de: PENDIENTE, PREVIA, FACTURADA'
+      });
+    }
+    
+    const operaciones = await Operacion.findByEstatus(estatus);
+    res.json(operaciones);
+  } catch (error) {
+    console.error('Error al obtener operaciones por estatus:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener las operaciones'
+    });
+  }
+};
+
+// Obtener operaciones pendientes
+exports.getOperacionesPendientes = async (req, res) => {
+  try {
+    const operaciones = await Operacion.findPendientes();
+    res.json(operaciones);
+  } catch (error) {
+    console.error('Error al obtener operaciones pendientes:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener las operaciones pendientes'
+    });
+  }
+};
+
+// Obtener operaciones previa
+exports.getOperacionesPrevia = async (req, res) => {
+  try {
+    const operaciones = await Operacion.findPrevia();
+    res.json(operaciones);
+  } catch (error) {
+    console.error('Error al obtener operaciones previa:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener las operaciones previa'
+    });
+  }
+};
+
+// Obtener operaciones facturadas
+exports.getOperacionesFacturadas = async (req, res) => {
+  try {
+    const operaciones = await Operacion.findFacturadas();
+    res.json(operaciones);
+  } catch (error) {
+    console.error('Error al obtener operaciones facturadas:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener las operaciones facturadas'
+    });
+  }
+};
 
 // Obtener todas las operaciones
 exports.getAllOperaciones = async (req, res) => {
@@ -34,6 +101,26 @@ exports.getOperacionById = async (req, res) => {
   }
 };
 
+// Obtener una operación por ID con sus conceptos de factura
+exports.getOperacionByIdWithConceptos = async (req, res) => {
+  try {
+    const operacion = await Operacion.findByIdWithConceptos(req.params.id);
+    if (!operacion) {
+      return res.status(404).json({
+        error: 'No encontrado',
+        message: 'Operación no encontrada'
+      });
+    }
+    res.json(operacion);
+  } catch (error) {
+    console.error('Error al obtener operación con conceptos:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudo obtener la operación'
+    });
+  }
+};
+
 // Crear una nueva operación
 exports.createOperacion = async (req, res) => {
   try {
@@ -53,7 +140,9 @@ exports.createOperacion = async (req, res) => {
       fecha_operacion,
       folio_factura,
       referencia,
-      costo
+      costo,
+      estatus,
+      conceptos_factura // Nueva propiedad para recibir lista de conceptos
     } = req.body;
 
     // Validación básica
@@ -87,33 +176,88 @@ exports.createOperacion = async (req, res) => {
       });
     }
 
+    // Validar que estatus sea válido si se proporciona
+    if (estatus && !['PENDIENTE', 'PREVIA', 'FACTURADA'].includes(estatus)) {
+      return res.status(400).json({
+        error: 'Datos inválidos',
+        message: 'estatus debe ser uno de: PENDIENTE, PREVIA, FACTURADA'
+      });
+    }
+
+    // Validar conceptos de factura si se proporcionan
+    if (conceptos_factura && Array.isArray(conceptos_factura)) {
+      for (const concepto of conceptos_factura) {
+        if (!concepto.descripcion || !concepto.clave_sat || !concepto.clave_unidad || 
+            !concepto.cantidad || !concepto.precio_unitario) {
+          return res.status(400).json({
+            error: 'Datos incompletos',
+            message: 'Cada concepto de factura debe tener: descripcion, clave_sat, clave_unidad, cantidad, precio_unitario'
+          });
+        }
+        
+        if (concepto.cantidad <= 0 || concepto.precio_unitario <= 0) {
+          return res.status(400).json({
+            error: 'Datos inválidos',
+            message: 'cantidad y precio_unitario deben ser números positivos'
+          });
+        }
+      }
+    }
+
     // Procesar imagen si se subió - la API asigna la ruta automáticamente
     let imagenUrl = null;
     if (req.file) {
       imagenUrl = `/uploads/${req.file.filename}`;
     }
 
-         const nuevaOperacion = await Operacion.create({
-       numero_operacion: numero_operacion || null,
-       id_cliente,
-       tipo_esquema,
-       porcentaje_esquema,
-       id_broker1: id_broker1 || null,
-       porcentaje_broker1: porcentaje_broker1 || null,
-       id_broker2: id_broker2 || null,
-       porcentaje_broker2: porcentaje_broker2 || null,
-       id_broker3: id_broker3 || null,
-       porcentaje_broker3: porcentaje_broker3 || null,
-       deposito: deposito || null,
-       id_empresa,
-       fecha_operacion,
-       folio_factura: folio_factura || null,
-       referencia: referencia || null,
-       costo: costo || 'SUBTOTAL',
-       imagen_url: imagenUrl
-     });
+    // Crear la operación
+    const nuevaOperacion = await Operacion.create({
+      numero_operacion: numero_operacion || null,
+      id_cliente,
+      tipo_esquema,
+      porcentaje_esquema,
+      id_broker1: id_broker1 || null,
+      porcentaje_broker1: porcentaje_broker1 || null,
+      id_broker2: id_broker2 || null,
+      porcentaje_broker2: porcentaje_broker2 || null,
+      id_broker3: id_broker3 || null,
+      porcentaje_broker3: porcentaje_broker3 || null,
+      deposito: deposito || null,
+      id_empresa,
+      fecha_operacion,
+      folio_factura: folio_factura || null,
+      referencia: referencia || null,
+      costo: costo || 'SUBTOTAL',
+      imagen_url: imagenUrl,
+      estatus: estatus || 'PENDIENTE'
+    });
 
-    res.status(201).json(nuevaOperacion);
+    // Crear los conceptos de factura si se proporcionaron
+    let conceptosCreados = [];
+    if (conceptos_factura && Array.isArray(conceptos_factura) && conceptos_factura.length > 0) {
+      for (const conceptoData of conceptos_factura) {
+        const conceptoCreado = await ConceptosFactura.create({
+          id_operacion: nuevaOperacion.id,
+          descripcion: conceptoData.descripcion,
+          clave_sat: conceptoData.clave_sat,
+          clave_unidad: conceptoData.clave_unidad,
+          cantidad: conceptoData.cantidad,
+          precio_unitario: conceptoData.precio_unitario
+        });
+        conceptosCreados.push(conceptoCreado);
+      }
+    }
+
+    // Preparar respuesta con la operación y sus conceptos
+    const respuesta = {
+      ...nuevaOperacion,
+      conceptos_factura: conceptosCreados
+    };
+
+    res.status(201).json({
+      message: 'Operación creada exitosamente',
+      operacion: respuesta
+    });
   } catch (error) {
     console.error('Error al crear operación:', error);
     res.status(500).json({
@@ -173,6 +317,17 @@ exports.updateOperacion = async (req, res) => {
         });
       }
       camposAActualizar.costo = req.body.costo;
+    }
+    
+    if (req.body.estatus !== undefined) {
+      if (!['PENDIENTE', 'PREVIA', 'FACTURADA'].includes(req.body.estatus)) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'estatus debe ser uno de: PENDIENTE, PREVIA, FACTURADA'
+        });
+      }
+      camposAActualizar.estatus = req.body.estatus;
+      console.log('Estatus agregado a camposAActualizar:', req.body.estatus);
     }
     
          if (req.body.folio_factura !== undefined) {
@@ -248,6 +403,7 @@ exports.updateOperacion = async (req, res) => {
     }
 
     // Actualizar solo con los campos proporcionados
+    console.log('Campos a actualizar:', camposAActualizar);
     const actualizado = await Operacion.update(id, camposAActualizar);
 
     if (!actualizado) {

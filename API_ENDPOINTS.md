@@ -149,12 +149,17 @@
 |--------|----------|-------------|------------------|
 | `GET` | `/operaciones` | Obtener todas las operaciones | Autenticado |
 | `GET` | `/operaciones/:id` | Obtener operación por ID | Autenticado |
+| `GET` | `/operaciones/:id/conceptos` | Obtener operación por ID con sus conceptos de factura | Autenticado |
+| `GET` | `/operaciones/estatus/:estatus` | Obtener operaciones por estatus (PENDIENTE, PREVIA, FACTURADA) | Autenticado |
+| `GET` | `/operaciones/pendientes` | Obtener operaciones pendientes | Autenticado |
+| `GET` | `/operaciones/previa` | Obtener operaciones previa | Autenticado |
+| `GET` | `/operaciones/facturadas` | Obtener operaciones facturadas | Autenticado |
 | `GET` | `/operaciones/sin-pagos` | Obtener operaciones sin pagos aplicados | Autenticado |
 | `GET` | `/operaciones/con-pagos-parciales` | Obtener operaciones con pagos parciales | Autenticado |
 | `GET` | `/operaciones/completamente-pagadas` | Obtener operaciones completamente pagadas | Autenticado |
 | `GET` | `/operaciones/no-completamente-pagadas` | Obtener operaciones no completamente pagadas (sin pagos + parciales) | Autenticado |
 | `GET` | `/operaciones/:id/estadisticas-pagos` | Obtener estadísticas de pagos de una operación | Autenticado |
-| `POST` | `/operaciones` | Crear nueva operación (con soporte para imagen) | `ADMINISTRACION`, `FACTURACION` |
+| `POST` | `/operaciones` | Crear nueva operación (con soporte para imagen y conceptos de factura) | `ADMINISTRACION`, `FACTURACION` |
 | `PUT` | `/operaciones/:id` | Actualizar operación (con soporte para imagen) | `ADMINISTRACION`, `FACTURACION` |
 | `DELETE` | `/operaciones/:id` | Eliminar operación | `ADMINISTRACION` |
 | `POST` | `/operaciones/:id/imagen` | Subir imagen para una operación | `ADMINISTRACION`, `FACTURACION` |
@@ -169,7 +174,8 @@
 
 **Crear/Actualizar operación con imagen:**
 - **Content-Type:** `multipart/form-data`
-- **Campos:** Todos los campos de operación + `imagen` (opcional)
+- **Campos:** Todos los campos de operación + `imagen` (opcional) + `estatus` (opcional)
+- **Estatus válidos:** `PENDIENTE` (por defecto), `PREVIA`, `FACTURADA`
 - **Nota:** El usuario solo envía el archivo de imagen, la API se encarga de asignar la ruta automáticamente
 - **Ejemplo:**
   ```bash
@@ -182,8 +188,98 @@
     -F "deposito=50000.00" \
     -F "id_empresa=1" \
     -F "fecha_operacion=2024-01-15" \
+    -F "estatus=PENDIENTE" \
     -F "imagen=@/path/to/image.jpg"
   ```
+
+**Ejemplo de creación con estatus:**
+```json
+{
+  "id_cliente": 1,
+  "tipo_esquema": "FACTURA",
+  "porcentaje_esquema": 10.50,
+  "deposito": 50000.00,
+  "id_empresa": 1,
+  "fecha_operacion": "2024-01-15",
+  "estatus": "PENDIENTE",
+  "conceptos_factura": [
+    {
+      "descripcion": "Servicio de consultoría",
+      "clave_sat": "84111506",
+      "clave_unidad": "H87",
+      "cantidad": 10.0,
+      "precio_unitario": 1500.00
+    }
+  ]
+}
+```
+
+---
+
+## 📋 Conceptos de Factura
+
+**Base URL:** `/api/conceptos-factura`
+
+| Método | Endpoint | Descripción | Roles Requeridos |
+|--------|----------|-------------|------------------|
+| `GET` | `/conceptos-factura` | Obtener todos los conceptos de factura | Autenticado |
+| `GET` | `/conceptos-factura/:id` | Obtener concepto de factura por ID | Autenticado |
+| `GET` | `/conceptos-factura/operacion/:idOperacion` | Obtener conceptos de factura por operación | Autenticado |
+| `GET` | `/conceptos-factura/operacion/:idOperacion/estadisticas` | Obtener estadísticas de conceptos por operación | Autenticado |
+| `GET` | `/conceptos-factura/por-clave-sat` | Obtener conceptos agrupados por clave SAT | Autenticado |
+| `GET` | `/conceptos-factura/por-clave-unidad` | Obtener conceptos agrupados por clave de unidad | Autenticado |
+| `POST` | `/conceptos-factura` | Crear nuevo concepto de factura | `ADMINISTRACION`, `FACTURACION` |
+| `PUT` | `/conceptos-factura/:id` | Actualizar concepto de factura | `ADMINISTRACION`, `FACTURACION` |
+| `DELETE` | `/conceptos-factura/:id` | Eliminar concepto de factura | `ADMINISTRACION` |
+| `DELETE` | `/conceptos-factura/operacion/:idOperacion` | Eliminar todos los conceptos de una operación | `ADMINISTRACION` |
+
+**Campos del concepto de factura:**
+- `id_operacion` (requerido): ID de la operación relacionada
+- `descripcion` (requerido): Descripción del concepto
+- `clave_sat` (requerido): Clave SAT del producto/servicio
+- `clave_unidad` (requerido): Clave de unidad de medida SAT
+- `cantidad` (requerido): Cantidad del concepto (decimal positivo)
+- `precio_unitario` (requerido): Precio unitario (decimal positivo)
+
+**Ejemplo de creación de concepto:**
+```json
+{
+  "id_operacion": 1,
+  "descripcion": "Servicio de consultoría",
+  "clave_sat": "84111506",
+  "clave_unidad": "H87",
+  "cantidad": 10.0,
+  "precio_unitario": 1500.00
+}
+```
+
+**Crear operación con conceptos de factura:**
+```json
+{
+  "id_cliente": 1,
+  "tipo_esquema": "FACTURA",
+  "porcentaje_esquema": 10.50,
+  "deposito": 50000.00,
+  "id_empresa": 1,
+  "fecha_operacion": "2024-01-15",
+  "conceptos_factura": [
+    {
+      "descripcion": "Servicio de consultoría",
+      "clave_sat": "84111506",
+      "clave_unidad": "H87",
+      "cantidad": 10.0,
+      "precio_unitario": 1500.00
+    },
+    {
+      "descripcion": "Desarrollo de software",
+      "clave_sat": "84111506",
+      "clave_unidad": "H87",
+      "cantidad": 5.0,
+      "precio_unitario": 2000.00
+    }
+  ]
+}
+```
 
 ---
 

@@ -47,17 +47,9 @@ class ConceptosFactura {
   static async findByOperacion(idOperacion) {
     try {
       const [rows] = await db.query(`
-        SELECT cf.*, 
-               o.numero_operacion,
-               o.folio_factura,
-               c.nombre as nombre_cliente,
-               e.nombre as nombre_empresa
-        FROM conceptos_factura cf
-        LEFT JOIN operaciones o ON cf.id_operacion = o.id
-        LEFT JOIN cliente c ON o.id_cliente = c.id
-        LEFT JOIN empresa e ON o.id_empresa = e.id
-        WHERE cf.id_operacion = ?
-        ORDER BY cf.id ASC
+        SELECT * FROM conceptos_factura
+        WHERE id_operacion = ?
+        ORDER BY id ASC
       `, [idOperacion]);
       return rows;
     } catch (error) {

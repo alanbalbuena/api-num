@@ -1,71 +1,7 @@
 const Operacion = require('../models/operacion.model');
 const ConceptosFactura = require('../models/conceptosFactura.model');
+const ComisionBroker = require('../models/comisionBroker.model');
 
-// Obtener operaciones por estatus
-exports.getOperacionesByEstatus = async (req, res) => {
-  try {
-    const { estatus } = req.params;
-    
-    // Validar que el estatus sea válido
-    if (!['PENDIENTE', 'PREVIA', 'FACTURADA'].includes(estatus)) {
-      return res.status(400).json({
-        error: 'Estatus inválido',
-        message: 'El estatus debe ser uno de: PENDIENTE, PREVIA, FACTURADA'
-      });
-    }
-    
-    const operaciones = await Operacion.findByEstatus(estatus);
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones por estatus:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones'
-    });
-  }
-};
-
-// Obtener operaciones pendientes
-exports.getOperacionesPendientes = async (req, res) => {
-  try {
-    const operaciones = await Operacion.findPendientes();
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones pendientes:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones pendientes'
-    });
-  }
-};
-
-// Obtener operaciones previa
-exports.getOperacionesPrevia = async (req, res) => {
-  try {
-    const operaciones = await Operacion.findPrevia();
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones previa:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones previa'
-    });
-  }
-};
-
-// Obtener operaciones facturadas
-exports.getOperacionesFacturadas = async (req, res) => {
-  try {
-    const operaciones = await Operacion.findFacturadas();
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones facturadas:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones facturadas'
-    });
-  }
-};
 
 // Obtener todas las operaciones
 exports.getAllOperaciones = async (req, res) => {
@@ -84,7 +20,7 @@ exports.getAllOperaciones = async (req, res) => {
 // Obtener una operación por ID
 exports.getOperacionById = async (req, res) => {
   try {
-    const operacion = await Operacion.findById(req.params.id);
+    const operacion = await Operacion.findByIdWithConceptos(req.params.id);
     if (!operacion) {
       return res.status(404).json({
         error: 'No encontrado',
@@ -101,25 +37,6 @@ exports.getOperacionById = async (req, res) => {
   }
 };
 
-// Obtener una operación por ID con sus conceptos de factura
-exports.getOperacionByIdWithConceptos = async (req, res) => {
-  try {
-    const operacion = await Operacion.findByIdWithConceptos(req.params.id);
-    if (!operacion) {
-      return res.status(404).json({
-        error: 'No encontrado',
-        message: 'Operación no encontrada'
-      });
-    }
-    res.json(operacion);
-  } catch (error) {
-    console.error('Error al obtener operación con conceptos:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudo obtener la operación'
-    });
-  }
-};
 
 // Crear una nueva operación
 exports.createOperacion = async (req, res) => {
@@ -248,14 +165,85 @@ exports.createOperacion = async (req, res) => {
       }
     }
 
-    // Preparar respuesta con la operación y sus conceptos
+      // Crear comisiones de brokers automáticamente si hay brokers y depósito
+      let comisionesCreadas = [];
+      if (nuevaOperacion.deposito && nuevaOperacion.deposito > 0) {
+        // Función para calcular comisión según la fórmula especificada
+        const calcularComision = (deposito, porcentajeEsquema, porcentajeBroker, costo) => {
+          if (costo === 'TOTAL') {
+            // Fórmula: (deposito * porcentaje_esquema) * porcentaje_broker
+            return (deposito * (porcentajeEsquema / 100)) * (porcentajeBroker / 100);
+          } else if (costo === 'SUBTOTAL') {
+            // Fórmula: ((deposito / 1.16) * porcentaje_esquema) * porcentaje_broker
+            return ((deposito / 1.16) * (porcentajeEsquema / 100)) * (porcentajeBroker / 100);
+          }
+          return 0;
+        };
+
+        // Broker 1
+        if (nuevaOperacion.id_broker1 && nuevaOperacion.porcentaje_broker1 && nuevaOperacion.porcentaje_broker1 > 0) {
+          const comisionBroker1 = calcularComision(
+            nuevaOperacion.deposito, 
+            nuevaOperacion.porcentaje_esquema, 
+            nuevaOperacion.porcentaje_broker1, 
+            nuevaOperacion.costo
+          );
+          const comisionCreada1 = await ComisionBroker.create({
+            id_broker: nuevaOperacion.id_broker1,
+            id_operacion: nuevaOperacion.id,
+            comision: comisionBroker1,
+            estatus: 'PENDIENTE',
+            metodo_pago: 'TRANSFERENCIA'
+          });
+          comisionesCreadas.push(comisionCreada1);
+        }
+
+        // Broker 2
+        if (nuevaOperacion.id_broker2 && nuevaOperacion.porcentaje_broker2 && nuevaOperacion.porcentaje_broker2 > 0) {
+          const comisionBroker2 = calcularComision(
+            nuevaOperacion.deposito, 
+            nuevaOperacion.porcentaje_esquema, 
+            nuevaOperacion.porcentaje_broker2, 
+            nuevaOperacion.costo
+          );
+          const comisionCreada2 = await ComisionBroker.create({
+            id_broker: nuevaOperacion.id_broker2,
+            id_operacion: nuevaOperacion.id,
+            comision: comisionBroker2,
+            estatus: 'PENDIENTE',
+            metodo_pago: 'TRANSFERENCIA'
+          });
+          comisionesCreadas.push(comisionCreada2);
+        }
+
+        // Broker 3
+        if (nuevaOperacion.id_broker3 && nuevaOperacion.porcentaje_broker3 && nuevaOperacion.porcentaje_broker3 > 0) {
+          const comisionBroker3 = calcularComision(
+            nuevaOperacion.deposito, 
+            nuevaOperacion.porcentaje_esquema, 
+            nuevaOperacion.porcentaje_broker3, 
+            nuevaOperacion.costo
+          );
+          const comisionCreada3 = await ComisionBroker.create({
+            id_broker: nuevaOperacion.id_broker3,
+            id_operacion: nuevaOperacion.id,
+            comision: comisionBroker3,
+            estatus: 'PENDIENTE',
+            metodo_pago: 'TRANSFERENCIA'
+          });
+          comisionesCreadas.push(comisionCreada3);
+        }
+      }
+
+    // Preparar respuesta con la operación, conceptos y comisiones
     const respuesta = {
       ...nuevaOperacion,
-      conceptos_factura: conceptosCreados
+      conceptos_factura: conceptosCreados,
+      comisiones_broker: comisionesCreadas
     };
 
     res.status(201).json({
-      message: 'Operación creada exitosamente',
+      message: `Operación creada exitosamente${conceptosCreados.length > 0 ? ` con ${conceptosCreados.length} concepto(s) de factura` : ''}${comisionesCreadas.length > 0 ? ` y ${comisionesCreadas.length} comisión(es) de broker` : ''}`,
       operacion: respuesta
     });
   } catch (error) {
@@ -452,82 +440,6 @@ exports.deleteOperacion = async (req, res) => {
   }
 };
 
-// Obtener operaciones sin pagos aplicados
-exports.getOperacionesSinPagos = async (req, res) => {
-  try {
-    const operaciones = await Operacion.findSinPagosAplicados();
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones sin pagos:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones sin pagos'
-    });
-  }
-};
-
-// Obtener operaciones con pagos parciales
-exports.getOperacionesConPagosParciales = async (req, res) => {
-  try {
-    const operaciones = await Operacion.findConPagosParciales();
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones con pagos parciales:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones con pagos parciales'
-    });
-  }
-};
-
-// Obtener operaciones completamente pagadas
-exports.getOperacionesCompletamentePagadas = async (req, res) => {
-  try {
-    const operaciones = await Operacion.findCompletamentePagadas();
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones completamente pagadas:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones completamente pagadas'
-    });
-  }
-};
-
-// Obtener estadísticas de pagos de una operación
-exports.getEstadisticasPagos = async (req, res) => {
-  try {
-    const estadisticas = await Operacion.getEstadisticasPagos(req.params.id);
-    if (!estadisticas) {
-      return res.status(404).json({
-        error: 'No encontrado',
-        message: 'Operación no encontrada'
-      });
-    }
-    res.json(estadisticas);
-  } catch (error) {
-    console.error('Error al obtener estadísticas de pagos:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las estadísticas de pagos'
-    });
-  }
-};
-
-// Obtener operaciones no completamente pagadas (sin pagos + parciales)
-exports.getOperacionesNoCompletamentePagadas = async (req, res) => {
-  try {
-    const empresaId = req.query.empresa || req.params.empresaId;
-    const operaciones = await Operacion.findNoCompletamentePagadas(empresaId);
-    res.json(operaciones);
-  } catch (error) {
-    console.error('Error al obtener operaciones no completamente pagadas:', error);
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: 'No se pudieron obtener las operaciones no completamente pagadas'
-    });
-  }
-};
 
 // Subir imagen para una operación
 exports.uploadImagen = async (req, res) => {

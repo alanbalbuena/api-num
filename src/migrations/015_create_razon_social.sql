@@ -5,13 +5,13 @@ CREATE TABLE IF NOT EXISTS razon_social (
   razon_social VARCHAR(255) NOT NULL,
   rfc VARCHAR(13) NOT NULL,
   regimen_fiscal VARCHAR(100) NOT NULL,
-  calle VARCHAR(255) NOT NULL,
+  calle VARCHAR(255) NULL,
   numero_interior VARCHAR(10) NULL,
-  numero_exterior VARCHAR(10) NOT NULL,
-  colonia VARCHAR(255) NOT NULL,
+  numero_exterior VARCHAR(10) NULL,
+  colonia VARCHAR(255) NULL,
   codigo_postal VARCHAR(10) NOT NULL,
-  ciudad VARCHAR(255) NOT NULL,
-  estado VARCHAR(255) NOT NULL,
+  ciudad VARCHAR(255) NULL,
+  estado VARCHAR(255) NULL,
   forma_pago VARCHAR(100) NULL ,
   metodo_pago VARCHAR(100) NULL ,
   uso_cfdi VARCHAR(100) NULL ,
@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS razon_social (
 -- Crear índices para mejorar el rendimiento
 CREATE INDEX idx_razon_social_cliente ON razon_social(id_cliente);
 CREATE INDEX idx_razon_social_rfc ON razon_social(rfc);
+
+MODIFY COLUMN calle VARCHAR(255) NULL,
+MODIFY COLUMN numero_exterior VARCHAR(10) NULL,
+MODIFY COLUMN colonia VARCHAR(255) NULL,
+MODIFY COLUMN ciudad VARCHAR(255) NULL,
+MODIFY COLUMN estado VARCHAR(255) NULL;

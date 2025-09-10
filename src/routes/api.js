@@ -18,6 +18,7 @@ const aplicacionPagoRoutes = require('./aplicacionPago.routes');
 const razonSocialRoutes = require('./razonSocial.routes');
 const esquemaRoutes = require('./esquema.routes');
 const conceptosFacturaRoutes = require('./conceptosFactura.routes');
+const comisionBrokerRoutes = require('./comisionBroker.routes');
 
 // Todas las rutas de la API requieren autenticación
 router.use(authenticateToken);
@@ -38,6 +39,7 @@ router.use('/aplicacion-pagos', aplicacionPagoRoutes);
 router.use('/razones-sociales', razonSocialRoutes);
 router.use('/esquemas', esquemaRoutes);
 router.use('/conceptos-factura', conceptosFacturaRoutes);
+router.use('/comision-broker', comisionBrokerRoutes);
 
 // Ejemplo de ruta GET
 router.get('/status', (req, res) => {

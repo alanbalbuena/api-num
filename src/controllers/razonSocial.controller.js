@@ -21,12 +21,11 @@ class RazonSocialController {
         uso_cfdi
       } = req.body;
 
-      // Validaciones básicas
-      if (!id_cliente || !razon_social || !rfc || !regimen_fiscal || !calle || 
-          !numero_exterior || !colonia || !codigo_postal || !ciudad || !estado) {
+      // Validaciones básicas - Solo campos obligatorios
+      if (!id_cliente || !razon_social || !rfc || !regimen_fiscal || !codigo_postal) {
         return res.status(400).json({
           success: false,
-          message: 'Todos los campos obligatorios deben estar presentes'
+          message: 'Los campos obligatorios son: id_cliente, razon_social, rfc, regimen_fiscal, codigo_postal'
         });
       }
 
@@ -232,12 +231,11 @@ class RazonSocialController {
         uso_cfdi
       } = req.body;
 
-      // Validaciones básicas
-      if (!id_cliente || !razon_social || !rfc || !regimen_fiscal || !calle || 
-          !numero_exterior || !colonia || !codigo_postal || !ciudad || !estado) {
+      // Validaciones básicas - Solo campos obligatorios
+      if (!id_cliente || !razon_social || !rfc || !regimen_fiscal || !codigo_postal) {
         return res.status(400).json({
           success: false,
-          message: 'Todos los campos obligatorios deben estar presentes'
+          message: 'Los campos obligatorios son: id_cliente, razon_social, rfc, regimen_fiscal, codigo_postal'
         });
       }
 

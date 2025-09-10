@@ -123,6 +123,22 @@
 | `PUT` | `/razones-sociales/:id` | Actualizar razón social | Autenticado |
 | `DELETE` | `/razones-sociales/:id` | Eliminar razón social | Autenticado |
 
+**Campos para crear/actualizar razón social:**
+- `id_cliente` (obligatorio): ID del cliente relacionado
+- `razon_social` (obligatorio): Nombre de la razón social
+- `rfc` (obligatorio): RFC de la razón social (12-13 caracteres)
+- `regimen_fiscal` (obligatorio): Régimen fiscal
+- `codigo_postal` (obligatorio): Código postal
+- `calle` (opcional): Calle de la dirección
+- `numero_interior` (opcional): Número interior
+- `numero_exterior` (opcional): Número exterior
+- `colonia` (opcional): Colonia
+- `ciudad` (opcional): Ciudad
+- `estado` (opcional): Estado
+- `forma_pago` (opcional): Forma de pago
+- `metodo_pago` (opcional): Método de pago
+- `uso_cfdi` (opcional): Uso de CFDI
+
 ---
 
 ## 🏦 Brokers
@@ -148,18 +164,8 @@
 | Método | Endpoint | Descripción | Roles Requeridos |
 |--------|----------|-------------|------------------|
 | `GET` | `/operaciones` | Obtener todas las operaciones | Autenticado |
-| `GET` | `/operaciones/:id` | Obtener operación por ID | Autenticado |
-| `GET` | `/operaciones/:id/conceptos` | Obtener operación por ID con sus conceptos de factura | Autenticado |
-| `GET` | `/operaciones/estatus/:estatus` | Obtener operaciones por estatus (PENDIENTE, PREVIA, FACTURADA) | Autenticado |
-| `GET` | `/operaciones/pendientes` | Obtener operaciones pendientes | Autenticado |
-| `GET` | `/operaciones/previa` | Obtener operaciones previa | Autenticado |
-| `GET` | `/operaciones/facturadas` | Obtener operaciones facturadas | Autenticado |
-| `GET` | `/operaciones/sin-pagos` | Obtener operaciones sin pagos aplicados | Autenticado |
-| `GET` | `/operaciones/con-pagos-parciales` | Obtener operaciones con pagos parciales | Autenticado |
-| `GET` | `/operaciones/completamente-pagadas` | Obtener operaciones completamente pagadas | Autenticado |
-| `GET` | `/operaciones/no-completamente-pagadas` | Obtener operaciones no completamente pagadas (sin pagos + parciales) | Autenticado |
-| `GET` | `/operaciones/:id/estadisticas-pagos` | Obtener estadísticas de pagos de una operación | Autenticado |
-| `POST` | `/operaciones` | Crear nueva operación (con soporte para imagen y conceptos de factura) | `ADMINISTRACION`, `FACTURACION` |
+| `GET` | `/operaciones/:id` | Obtener operación por ID (incluye conceptos de factura y razón social) | Autenticado |
+| `POST` | `/operaciones` | Crear nueva operación (con soporte para imagen, conceptos de factura y comisiones de broker automáticas) | `ADMINISTRACION`, `FACTURACION` |
 | `PUT` | `/operaciones/:id` | Actualizar operación (con soporte para imagen) | `ADMINISTRACION`, `FACTURACION` |
 | `DELETE` | `/operaciones/:id` | Eliminar operación | `ADMINISTRACION` |
 | `POST` | `/operaciones/:id/imagen` | Subir imagen para una operación | `ADMINISTRACION`, `FACTURACION` |
@@ -202,6 +208,10 @@
   "id_empresa": 1,
   "fecha_operacion": "2024-01-15",
   "estatus": "PENDIENTE",
+  "id_broker1": 1,
+  "porcentaje_broker1": 5.0,
+  "id_broker2": 2,
+  "porcentaje_broker2": 3.0,
   "conceptos_factura": [
     {
       "descripcion": "Servicio de consultoría",
@@ -213,6 +223,61 @@
   ]
 }
 ```
+
+**Respuesta de creación (incluye comisiones automáticas):**
+```json
+{
+  "message": "Operación creada exitosamente con 1 concepto(s) de factura y 2 comisión(es) de broker",
+  "operacion": {
+    "id": 1,
+    "numero_operacion": "OP001",
+    "deposito": 50000.00,
+    "id_broker1": 1,
+    "porcentaje_broker1": 5.0,
+    "id_broker2": 2,
+    "porcentaje_broker2": 3.0,
+    "conceptos_factura": [
+      {
+        "id": 1,
+        "descripcion": "Servicio de consultoría",
+        "clave_sat": "84111506",
+        "clave_unidad": "H87",
+        "cantidad": 10.0,
+        "precio_unitario": 1500.00
+      }
+    ],
+    "comisiones_broker": [
+      {
+        "id": 1,
+        "id_broker": 1,
+        "id_operacion": 1,
+        "comision": 2500.00,
+        "estatus": "PENDIENTE",
+        "metodo_pago": "TRANSFERENCIA",
+        "nombre_broker": "Broker 1"
+      },
+      {
+        "id": 2,
+        "id_broker": 2,
+        "id_operacion": 1,
+        "comision": 1500.00,
+        "estatus": "PENDIENTE",
+        "metodo_pago": "TRANSFERENCIA",
+        "nombre_broker": "Broker 2"
+      }
+    ]
+  }
+}
+```
+
+**Nota sobre comisiones automáticas:**
+- Las comisiones se calculan automáticamente según el campo `costo`:
+  - Si `costo = 'TOTAL'`: `(deposito * porcentaje_esquema) * porcentaje_broker`
+  - Si `costo = 'SUBTOTAL'`: `((deposito / 1.16) * porcentaje_esquema) * porcentaje_broker`
+- Se crean solo si hay `deposito > 0` y `porcentaje_broker > 0`
+- Estado inicial: `PENDIENTE`
+- Método de pago inicial: `TRANSFERENCIA`
+- Se crean para broker1, broker2 y broker3 según corresponda
 
 ---
 
@@ -278,6 +343,86 @@
       "precio_unitario": 2000.00
     }
   ]
+}
+```
+
+---
+
+## 💰 Comisión Broker
+
+**Base URL:** `/api/comision-broker`
+
+| Método | Endpoint | Descripción | Roles Requeridos |
+|--------|----------|-------------|------------------|
+| `GET` | `/comision-broker` | Obtener todas las comisiones de broker | Autenticado |
+| `GET` | `/comision-broker/:id` | Obtener comisión de broker por ID | Autenticado |
+| `GET` | `/comision-broker/broker/:idBroker` | Obtener comisiones por broker | Autenticado |
+| `GET` | `/comision-broker/broker/:idBroker/estadisticas` | Obtener estadísticas de comisiones por broker | Autenticado |
+| `GET` | `/comision-broker/operacion/:idOperacion` | Obtener comisiones por operación | Autenticado |
+| `GET` | `/comision-broker/estatus/:estatus` | Obtener comisiones por estatus (PENDIENTE, PAGADA, CANCELADA) | Autenticado |
+| `GET` | `/comision-broker/pendientes` | Obtener comisiones pendientes | Autenticado |
+| `GET` | `/comision-broker/pagadas` | Obtener comisiones pagadas | Autenticado |
+| `GET` | `/comision-broker/canceladas` | Obtener comisiones canceladas | Autenticado |
+| `GET` | `/comision-broker/estadisticas-generales` | Obtener estadísticas generales de comisiones | Autenticado |
+| `GET` | `/comision-broker/rango-fechas?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD` | Obtener comisiones por rango de fechas | Autenticado |
+| `POST` | `/comision-broker` | Crear nueva comisión de broker | `ADMINISTRACION`, `FACTURACION` |
+| `PUT` | `/comision-broker/:id` | Actualizar comisión de broker | `ADMINISTRACION`, `FACTURACION` |
+| `DELETE` | `/comision-broker/:id` | Eliminar comisión de broker | `ADMINISTRACION` |
+| `DELETE` | `/comision-broker/operacion/:idOperacion` | Eliminar todas las comisiones de una operación | `ADMINISTRACION` |
+
+**Campos de la comisión de broker:**
+- `id_broker` (requerido): ID del broker relacionado
+- `id_operacion` (requerido): ID de la operación relacionada
+- `comision` (requerido): Monto de la comisión (decimal positivo)
+- `estatus` (opcional): Estado de la comisión - `PENDIENTE` (por defecto), `PAGADA`, `CANCELADA`
+- `metodo_pago` (opcional): Método de pago - `TRANSFERENCIA` (por defecto), `EFECTIVO`
+- `fecha_pago` (opcional): Fecha de pago (YYYY-MM-DD)
+
+**Ejemplo de creación de comisión:**
+```json
+{
+  "id_broker": 1,
+  "id_operacion": 1,
+  "comision": 1500.00,
+  "estatus": "PENDIENTE",
+  "metodo_pago": "TRANSFERENCIA",
+  "fecha_pago": "2024-01-15"
+}
+```
+
+**Ejemplo de respuesta:**
+```json
+{
+  "message": "Comisión de broker creada exitosamente",
+  "comision": {
+    "id": 1,
+    "id_broker": 1,
+    "id_operacion": 1,
+    "comision": 1500.00,
+    "estatus": "PENDIENTE",
+    "metodo_pago": "TRANSFERENCIA",
+    "fecha_pago": "2024-01-15",
+    "nombre_broker": "Broker Ejemplo",
+    "numero_operacion": "OP001",
+    "folio_factura": "F001",
+    "fecha_operacion": "2024-01-15",
+    "nombre_cliente": "Cliente Ejemplo",
+    "nombre_empresa": "Empresa Ejemplo",
+    "created_at": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Estadísticas de comisiones por broker:**
+```json
+{
+  "total_comisiones": 25,
+  "comisiones_pendientes": 10,
+  "comisiones_pagadas": 12,
+  "comisiones_canceladas": 3,
+  "total_comision": 37500.00,
+  "total_pagado": 18000.00,
+  "total_pendiente": 15000.00
 }
 ```
 

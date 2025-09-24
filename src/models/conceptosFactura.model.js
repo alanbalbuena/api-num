@@ -65,7 +65,9 @@ class ConceptosFactura {
       clave_sat,
       clave_unidad,
       cantidad,
-      precio_unitario
+      precio_unitario,
+      check_con_iva,
+      precio
     } = conceptoData;
     
     try {
@@ -76,15 +78,19 @@ class ConceptosFactura {
           clave_sat,
           clave_unidad,
           cantidad,
-          precio_unitario
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+          precio_unitario,
+          check_con_iva,
+          precio
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id_operacion,
           descripcion,
           clave_sat,
           clave_unidad,
           cantidad,
-          precio_unitario
+          precio_unitario,
+          check_con_iva || false,
+          precio || (cantidad * precio_unitario)
         ]
       );
       
@@ -132,6 +138,16 @@ class ConceptosFactura {
       if (conceptoData.precio_unitario !== undefined) {
         camposAActualizar.push('precio_unitario = ?');
         valores.push(conceptoData.precio_unitario);
+      }
+      
+      if (conceptoData.check_con_iva !== undefined) {
+        camposAActualizar.push('check_con_iva = ?');
+        valores.push(conceptoData.check_con_iva);
+      }
+      
+      if (conceptoData.precio !== undefined) {
+        camposAActualizar.push('precio = ?');
+        valores.push(conceptoData.precio);
       }
       
       // Si no hay campos para actualizar, retornar false

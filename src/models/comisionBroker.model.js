@@ -81,7 +81,7 @@ class ComisionBroker {
           id_operacion,
           comision,
           estatus || 'PENDIENTE',
-          metodo_pago || 'TRANSFERENCIA',
+          metodo_pago || null,
           fecha_pago
         ]
       );

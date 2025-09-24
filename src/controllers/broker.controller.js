@@ -6,14 +6,14 @@ exports.getAllBrokers = async (req, res) => {
     const { search, q } = req.query;
     const searchTerm = search || q;
     
-    // Si hay un término de búsqueda, usar la búsqueda
+    // Si hay un término de búsqueda, usar la búsqueda con saldo
     if (searchTerm) {
-      const brokers = await Broker.searchByName(searchTerm);
+      const brokers = await Broker.searchByNameWithSaldo(searchTerm);
       return res.json(brokers);
     }
     
-    // Si no hay búsqueda, obtener todos los brokers
-    const brokers = await Broker.findAll();
+    // Si no hay búsqueda, obtener todos los brokers con saldo
+    const brokers = await Broker.findAllWithSaldo();
     res.json(brokers);
   } catch (error) {
     console.error('Error al obtener brokers:', error);
@@ -42,7 +42,7 @@ exports.getActiveBrokers = async (req, res) => {
 exports.getBrokerById = async (req, res) => {
   try {
     const { id } = req.params;
-    const broker = await Broker.findById(id);
+    const broker = await Broker.findByIdWithSaldo(id);
     
     if (!broker) {
       return res.status(404).json({
@@ -186,7 +186,7 @@ exports.getBrokersByLetter = async (req, res) => {
       });
     }
 
-    const brokers = await Broker.findByLetter(letter);
+    const brokers = await Broker.findByLetterWithSaldo(letter);
     res.json(brokers);
   } catch (error) {
     console.error('Error al obtener brokers por letra:', error);

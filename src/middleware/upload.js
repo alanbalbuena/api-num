@@ -21,6 +21,19 @@ const storage = multer.diskStorage({
   }
 });
 
+// Configuración de almacenamiento para retornos
+const storageRetornos = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Generar nombre único para el archivo
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'retorno-' + uniqueSuffix + ext);
+  }
+});
+
 // Filtro para tipos de archivo permitidos
 const fileFilter = (req, file, cb) => {
   // Permitir solo imágenes
@@ -40,8 +53,20 @@ const upload = multer({
   }
 });
 
-// Middleware para subir una sola imagen
+// Configuración de multer para retornos
+const uploadRetornos = multer({
+  storage: storageRetornos,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB máximo
+  }
+});
+
+// Middleware para subir una sola imagen (operaciones)
 const uploadSingleImage = upload.single('imagen');
+
+// Middleware para subir imagen de comprobante (retornos)
+const uploadComprobantePago = uploadRetornos.single('comprobante_pago');
 
 // Middleware para manejar errores de multer
 const handleUploadError = (err, req, res, next) => {
@@ -63,6 +88,7 @@ const handleUploadError = (err, req, res, next) => {
 
 module.exports = {
   uploadSingleImage,
+  uploadComprobantePago,
   handleUploadError,
   uploadDir
-}; 
+};

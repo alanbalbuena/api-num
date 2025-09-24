@@ -56,7 +56,8 @@ exports.createRetorno = async (req, res) => {
       id_operacion,
       fecha_pago,
       monto_pagado,
-      metodo_pago
+      metodo_pago,
+      referencia
     } = req.body;
 
     // Validación básica
@@ -93,11 +94,19 @@ exports.createRetorno = async (req, res) => {
       });
     }
 
+    // Procesar imagen si se subió
+    let comprobante_pago = null;
+    if (req.file) {
+      comprobante_pago = `/uploads/${req.file.filename}`;
+    }
+
     const nuevoRetorno = await Retorno.create({
       id_operacion,
       fecha_pago,
       monto_pagado,
-      metodo_pago
+      metodo_pago,
+      referencia: referencia || null,
+      comprobante_pago
     });
 
     res.status(201).json({
@@ -121,7 +130,8 @@ exports.updateRetorno = async (req, res) => {
       id_operacion,
       fecha_pago,
       monto_pagado,
-      metodo_pago
+      metodo_pago,
+      referencia
     } = req.body;
 
     // Validación básica
@@ -149,11 +159,19 @@ exports.updateRetorno = async (req, res) => {
       });
     }
 
+    // Procesar imagen si se subió
+    let comprobante_pago = null;
+    if (req.file) {
+      comprobante_pago = `/uploads/${req.file.filename}`;
+    }
+
     const actualizado = await Retorno.update(id, {
       id_operacion,
       fecha_pago,
       monto_pagado,
-      metodo_pago
+      metodo_pago,
+      referencia: referencia || null,
+      comprobante_pago
     });
 
     if (!actualizado) {
@@ -236,4 +254,4 @@ exports.getRetornosByDateRange = async (req, res) => {
       message: 'No se pudieron obtener los retornos por rango de fechas'
     });
   }
-}; 
+};

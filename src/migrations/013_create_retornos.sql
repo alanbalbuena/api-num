@@ -4,6 +4,8 @@ CREATE TABLE retornos (
     fecha_pago DATE NOT NULL,
     monto_pagado DECIMAL(15,2) NOT NULL,
     metodo_pago ENUM('EFECTIVO', 'TRANSFERENCIA') NOT NULL,
+    referencia VARCHAR(255) NULL,
+    comprobante_pago VARCHAR(500) NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     

@@ -841,21 +841,23 @@
                     {
                         "method": "GET",
                         "path": "/brokers",
-                        "description": "Obtener todos los brokers",
+                        "description": "Obtener todos los brokers (incluye saldo pendiente)",
                         "roles": ["Autenticado"],
                         "request": {},
                         "response": {
-                            "brokers": "array"
+                            "brokers": "array",
+                            "saldo_pendiente": "number"
                         }
                     },
                     {
                         "method": "GET",
                         "path": "/brokers/:id",
-                        "description": "Obtener broker por ID",
+                        "description": "Obtener broker por ID (incluye saldo pendiente)",
                         "roles": ["Autenticado"],
                         "request": {},
                         "response": {
-                            "broker": "object"
+                            "broker": "object",
+                            "saldo_pendiente": "number"
                         }
                     },
                     {
@@ -871,11 +873,12 @@
                     {
                         "method": "GET",
                         "path": "/brokers/letter/:letter",
-                        "description": "Buscar brokers por letra",
+                        "description": "Buscar brokers por letra (incluye saldo pendiente)",
                         "roles": ["Autenticado"],
                         "request": {},
                         "response": {
-                            "brokers": "array"
+                            "brokers": "array",
+                            "saldo_pendiente": "number"
                         }
                     },
                     {

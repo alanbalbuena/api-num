@@ -9,6 +9,7 @@ router.use(authenticateToken);
 
 // Rutas para operaciones
 router.get('/', operacionController.getAllOperaciones);
+router.get('/no-completamente-pagadas', operacionController.getOperacionesNoCompletamentePagadas);
 router.get('/:id', operacionController.getOperacionById);
 
 // Rutas para crear y actualizar operaciones (con soporte para imágenes)
@@ -43,6 +44,12 @@ router.delete('/:id/imagen',
 router.post('/:id/recalcular-saldo', 
   authorizeRoles('ADMINISTRACION', 'FACTURACION'), 
   operacionController.recalcularSaldo
+);
+
+// Ruta para recalcular comisiones de una operación
+router.post('/:id/recalcular-comisiones', 
+  authorizeRoles('ADMINISTRACION', 'FACTURACION'), 
+  operacionController.recalcularComisiones
 );
 
 module.exports = router; 

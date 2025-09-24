@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const retornoController = require('../controllers/retorno.controller');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const { uploadComprobantePago, handleUploadError } = require('../middleware/upload');
 
 // Todas las rutas de retornos requieren autenticación
 router.use(authenticateToken);
@@ -14,8 +15,18 @@ router.get('/estadisticas/operacion/:idOperacion', retornoController.getEstadist
 router.get('/fechas/rango', retornoController.getRetornosByDateRange);
 
 // Rutas que requieren permisos específicos
-router.post('/', authorizeRoles('ADMINISTRACION', 'FACTURACION'), retornoController.createRetorno);
-router.put('/:id', authorizeRoles('ADMINISTRACION', 'FACTURACION'), retornoController.updateRetorno);
+router.post('/', 
+  authorizeRoles('ADMINISTRACION', 'FACTURACION'), 
+  uploadComprobantePago, 
+  handleUploadError, 
+  retornoController.createRetorno
+);
+router.put('/:id', 
+  authorizeRoles('ADMINISTRACION', 'FACTURACION'), 
+  uploadComprobantePago, 
+  handleUploadError, 
+  retornoController.updateRetorno
+);
 router.delete('/:id', authorizeRoles('ADMINISTRACION'), retornoController.deleteRetorno);
 
 module.exports = router; 

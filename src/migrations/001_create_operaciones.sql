@@ -17,6 +17,17 @@ CREATE TABLE IF NOT EXISTS operaciones (
   referencia VARCHAR(100) NULL,
   saldo DECIMAL(10,2) DEFAULT 0.00,
   estatus ENUM('PENDIENTE', 'PREVIA', 'FACTURADA') DEFAULT 'PENDIENTE',
+  imagen_url VARCHAR(255) NULL,
+  subtotal DECIMAL(10,2) DEFAULT 0.00,
+  iva DECIMAL(10,2) DEFAULT 0.00,
+  total DECIMAL(10,2) DEFAULT 0.00,   
+  porcentaje_cms_general DECIMAL(10,2) DEFAULT 0.00,
+  cms_general_num DECIMAL(10,2) DEFAULT 0.00,
+  fondo_ahorro DECIMAL(10,2) DEFAULT 0.00,  cms_fondo_ahorro_libre DECIMAL(10,2) DEFAULT 0.00,
+  cms_hector DECIMAL(10,2) DEFAULT 0.00,
+  cms_kuri DECIMAL(10,2) DEFAULT 0.00,  
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 
   CONSTRAINT fk_id_cliente FOREIGN KEY (id_cliente) REFERENCES cliente(id),
   CONSTRAINT fk_id_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id),

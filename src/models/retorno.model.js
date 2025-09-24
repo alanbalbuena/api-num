@@ -59,18 +59,24 @@ class Retorno {
       id_operacion,
       fecha_pago,
       monto_pagado,
-      metodo_pago
+      metodo_pago,
+      referencia,
+      comprobante_pago
     } = retornoData;
+    
     try {
       const [result] = await db.query(
         `INSERT INTO retornos (
           id_operacion,
           fecha_pago,
           monto_pagado,
-          metodo_pago
-        ) VALUES (?, ?, ?, ?)`,
-        [id_operacion, fecha_pago, monto_pagado, metodo_pago]
+          metodo_pago,
+          referencia,
+          comprobante_pago
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id_operacion, fecha_pago, monto_pagado, metodo_pago, referencia, comprobante_pago]
       );
+      
       return { id_retorno: result.insertId, ...retornoData };
     } catch (error) {
       throw error;
@@ -83,7 +89,9 @@ class Retorno {
       id_operacion,
       fecha_pago,
       monto_pagado,
-      metodo_pago
+      metodo_pago,
+      referencia,
+      comprobante_pago
     } = retornoData;
     try {
       const [result] = await db.query(
@@ -91,9 +99,11 @@ class Retorno {
           id_operacion = ?,
           fecha_pago = ?,
           monto_pagado = ?,
-          metodo_pago = ?
+          metodo_pago = ?,
+          referencia = ?,
+          comprobante_pago = ?
           WHERE id_retorno = ?`,
-        [id_operacion, fecha_pago, monto_pagado, metodo_pago, id]
+        [id_operacion, fecha_pago, monto_pagado, metodo_pago, referencia, comprobante_pago, id]
       );
       return result.affectedRows > 0;
     } catch (error) {
@@ -149,4 +159,4 @@ class Retorno {
   }
 }
 
-module.exports = Retorno; 
+module.exports = Retorno;

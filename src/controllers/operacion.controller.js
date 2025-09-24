@@ -2,6 +2,13 @@ const Operacion = require('../models/operacion.model');
 const ConceptosFactura = require('../models/conceptosFactura.model');
 const ComisionBroker = require('../models/comisionBroker.model');
 
+/**
+ * Controlador para operaciones
+ * Incluye campos automáticos: created_at, updated_at
+ * Incluye campos de montos: subtotal, iva, total
+ * Incluye campos de comisiones: porcentaje_cms_general, cms_general_num, fondo_ahorro, cms_fondo_ahorro_libre, cms_hector, cms_kuri
+ */
+
 
 // Obtener todas las operaciones
 exports.getAllOperaciones = async (req, res) => {
@@ -59,7 +66,16 @@ exports.createOperacion = async (req, res) => {
       referencia,
       costo,
       estatus,
-      conceptos_factura // Nueva propiedad para recibir lista de conceptos
+      conceptos_factura, // Nueva propiedad para recibir lista de conceptos
+      subtotal,
+      iva,
+      total,
+      porcentaje_cms_general,
+      cms_general_num,
+      fondo_ahorro,
+      cms_fondo_ahorro_libre,
+      cms_hector,
+      cms_kuri
     } = req.body;
 
     // Validación básica
@@ -103,22 +119,40 @@ exports.createOperacion = async (req, res) => {
 
     // Validar conceptos de factura si se proporcionan
     if (conceptos_factura && Array.isArray(conceptos_factura)) {
-      for (const concepto of conceptos_factura) {
-        if (!concepto.descripcion || !concepto.clave_sat || !concepto.clave_unidad || 
-            !concepto.cantidad || !concepto.precio_unitario) {
-          return res.status(400).json({
-            error: 'Datos incompletos',
-            message: 'Cada concepto de factura debe tener: descripcion, clave_sat, clave_unidad, cantidad, precio_unitario'
-          });
+        for (const concepto of conceptos_factura) {
+          if (!concepto.descripcion || !concepto.clave_sat || !concepto.clave_unidad || 
+              !concepto.cantidad || !concepto.precio_unitario) {
+            return res.status(400).json({
+              error: 'Datos incompletos',
+              message: 'Cada concepto de factura debe tener: descripcion, clave_sat, clave_unidad, cantidad, precio_unitario'
+            });
+          }
+          
+          if (concepto.cantidad <= 0 || concepto.precio_unitario <= 0) {
+            return res.status(400).json({
+              error: 'Datos inválidos',
+              message: 'cantidad y precio_unitario deben ser números positivos'
+            });
+          }
+          
+          // Validar check_con_iva si se proporciona
+          if (concepto.check_con_iva !== undefined && typeof concepto.check_con_iva !== 'boolean') {
+            return res.status(400).json({
+              error: 'Datos inválidos',
+              message: 'check_con_iva debe ser un valor booleano (true o false)'
+            });
+          }
+          
+          // Validar precio si se proporciona
+          if (concepto.precio !== undefined) {
+            if (typeof concepto.precio !== 'number' || concepto.precio < 0) {
+              return res.status(400).json({
+                error: 'Datos inválidos',
+                message: 'precio debe ser un número positivo'
+              });
+            }
+          }
         }
-        
-        if (concepto.cantidad <= 0 || concepto.precio_unitario <= 0) {
-          return res.status(400).json({
-            error: 'Datos inválidos',
-            message: 'cantidad y precio_unitario deben ser números positivos'
-          });
-        }
-      }
     }
 
     // Procesar imagen si se subió - la API asigna la ruta automáticamente
@@ -146,7 +180,16 @@ exports.createOperacion = async (req, res) => {
       referencia: referencia || null,
       costo: costo || 'SUBTOTAL',
       imagen_url: imagenUrl,
-      estatus: estatus || 'PENDIENTE'
+      estatus: estatus || 'PENDIENTE',
+      subtotal: subtotal || 0.00,
+      iva: iva || 0.00,
+      total: total || 0.00,
+      porcentaje_cms_general: porcentaje_cms_general || 0.00,
+      cms_general_num: cms_general_num || 0.00,
+      fondo_ahorro: fondo_ahorro || 0.00,
+      cms_fondo_ahorro_libre: cms_fondo_ahorro_libre || 0.00,
+      cms_hector: cms_hector || 0.00,
+      cms_kuri: cms_kuri || 0.00
     });
 
     // Crear los conceptos de factura si se proporcionaron
@@ -193,7 +236,7 @@ exports.createOperacion = async (req, res) => {
             id_operacion: nuevaOperacion.id,
             comision: comisionBroker1,
             estatus: 'PENDIENTE',
-            metodo_pago: 'TRANSFERENCIA'
+            metodo_pago: null
           });
           comisionesCreadas.push(comisionCreada1);
         }
@@ -211,7 +254,7 @@ exports.createOperacion = async (req, res) => {
             id_operacion: nuevaOperacion.id,
             comision: comisionBroker2,
             estatus: 'PENDIENTE',
-            metodo_pago: 'TRANSFERENCIA'
+            metodo_pago: null
           });
           comisionesCreadas.push(comisionCreada2);
         }
@@ -229,7 +272,7 @@ exports.createOperacion = async (req, res) => {
             id_operacion: nuevaOperacion.id,
             comision: comisionBroker3,
             estatus: 'PENDIENTE',
-            metodo_pago: 'TRANSFERENCIA'
+            metodo_pago: null
           });
           comisionesCreadas.push(comisionCreada3);
         }
@@ -271,6 +314,52 @@ exports.updateOperacion = async (req, res) => {
 
     // Solo validar y actualizar los campos que se envían
     const camposAActualizar = {};
+    
+    // Validar conceptos de factura si se proporcionan
+    if (req.body.conceptos_factura !== undefined) {
+      if (Array.isArray(req.body.conceptos_factura)) {
+        for (const concepto of req.body.conceptos_factura) {
+          if (!concepto.descripcion || !concepto.clave_sat || !concepto.clave_unidad || 
+              !concepto.cantidad || !concepto.precio_unitario) {
+            return res.status(400).json({
+              error: 'Datos incompletos',
+              message: 'Cada concepto de factura debe tener: descripcion, clave_sat, clave_unidad, cantidad, precio_unitario'
+            });
+          }
+          
+          if (concepto.cantidad <= 0 || concepto.precio_unitario <= 0) {
+            return res.status(400).json({
+              error: 'Datos inválidos',
+              message: 'cantidad y precio_unitario deben ser números positivos'
+            });
+          }
+          
+          // Validar check_con_iva si se proporciona
+          if (concepto.check_con_iva !== undefined && typeof concepto.check_con_iva !== 'boolean') {
+            return res.status(400).json({
+              error: 'Datos inválidos',
+              message: 'check_con_iva debe ser un valor booleano (true o false)'
+            });
+          }
+          
+          // Validar precio si se proporciona
+          if (concepto.precio !== undefined) {
+            if (typeof concepto.precio !== 'number' || concepto.precio < 0) {
+              return res.status(400).json({
+                error: 'Datos inválidos',
+                message: 'precio debe ser un número positivo'
+              });
+            }
+          }
+        }
+        camposAActualizar.conceptos_factura = req.body.conceptos_factura;
+      } else {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'conceptos_factura debe ser un array'
+        });
+      }
+    }
     
     // Campos seguros para actualizar individualmente
     if (req.body.numero_operacion !== undefined) {
@@ -325,6 +414,98 @@ exports.updateOperacion = async (req, res) => {
      if (req.body.referencia !== undefined) {
        camposAActualizar.referencia = req.body.referencia;
      }
+    
+    // Campos de montos
+    if (req.body.subtotal !== undefined) {
+      if (req.body.subtotal < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'subtotal no puede ser negativo'
+        });
+      }
+      camposAActualizar.subtotal = req.body.subtotal;
+    }
+    
+    if (req.body.iva !== undefined) {
+      if (req.body.iva < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'iva no puede ser negativo'
+        });
+      }
+      camposAActualizar.iva = req.body.iva;
+    }
+    
+    if (req.body.total !== undefined) {
+      if (req.body.total < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'total no puede ser negativo'
+        });
+      }
+      camposAActualizar.total = req.body.total;
+    }
+    
+    // Campos de comisiones y fondos
+    if (req.body.porcentaje_cms_general !== undefined) {
+      if (req.body.porcentaje_cms_general < 0 || req.body.porcentaje_cms_general > 100) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'porcentaje_cms_general debe estar entre 0 y 100'
+        });
+      }
+      camposAActualizar.porcentaje_cms_general = req.body.porcentaje_cms_general;
+    }
+    
+    if (req.body.cms_general_num !== undefined) {
+      if (req.body.cms_general_num < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'cms_general_num no puede ser negativo'
+        });
+      }
+      camposAActualizar.cms_general_num = req.body.cms_general_num;
+    }
+    
+    if (req.body.fondo_ahorro !== undefined) {
+      if (req.body.fondo_ahorro < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'fondo_ahorro no puede ser negativo'
+        });
+      }
+      camposAActualizar.fondo_ahorro = req.body.fondo_ahorro;
+    }
+    
+    if (req.body.cms_fondo_ahorro_libre !== undefined) {
+      if (req.body.cms_fondo_ahorro_libre < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'cms_fondo_ahorro_libre no puede ser negativo'
+        });
+      }
+      camposAActualizar.cms_fondo_ahorro_libre = req.body.cms_fondo_ahorro_libre;
+    }
+    
+    if (req.body.cms_hector !== undefined) {
+      if (req.body.cms_hector < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'cms_hector no puede ser negativo'
+        });
+      }
+      camposAActualizar.cms_hector = req.body.cms_hector;
+    }
+    
+    if (req.body.cms_kuri !== undefined) {
+      if (req.body.cms_kuri < 0) {
+        return res.status(400).json({
+          error: 'Datos inválidos',
+          message: 'cms_kuri no puede ser negativo'
+        });
+      }
+      camposAActualizar.cms_kuri = req.body.cms_kuri;
+    }
     
     if (req.body.fecha_operacion !== undefined) {
       // Validar formato de fecha
@@ -392,9 +573,9 @@ exports.updateOperacion = async (req, res) => {
 
     // Actualizar solo con los campos proporcionados
     console.log('Campos a actualizar:', camposAActualizar);
-    const actualizado = await Operacion.update(id, camposAActualizar);
+    const resultado = await Operacion.update(id, camposAActualizar);
 
-    if (!actualizado) {
+    if (!resultado.operacionActualizada) {
       return res.status(500).json({
         error: 'Error interno del servidor',
         message: 'No se pudo actualizar la operación'
@@ -402,11 +583,12 @@ exports.updateOperacion = async (req, res) => {
     }
 
     // Obtener la operación actualizada
-    const operacionActualizada = await Operacion.findById(id);
+    const operacionActualizada = await Operacion.findByIdWithConceptos(id);
 
     res.json({
       message: 'Operación actualizada exitosamente',
       campos_actualizados: Object.keys(camposAActualizar),
+      conceptos_actualizados: resultado.conceptosActualizados.length,
       operacion: operacionActualizada
     });
   } catch (error) {
@@ -587,6 +769,65 @@ exports.recalcularSaldo = async (req, res) => {
     res.status(500).json({
       error: 'Error interno del servidor',
       message: 'No se pudo recalcular el saldo'
+    });
+  }
+};
+
+// Recalcular comisiones de una operación
+exports.recalcularComisiones = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar si la operación existe
+    const operacion = await Operacion.findById(id);
+    if (!operacion) {
+      return res.status(404).json({
+        error: 'No encontrado',
+        message: 'Operación no encontrada'
+      });
+    }
+
+    // Guardar valores anteriores para comparación
+    const comisionesAnteriores = {
+      porcentaje_cms_general: operacion.porcentaje_cms_general,
+      cms_general_num: operacion.cms_general_num,
+      fondo_ahorro: operacion.fondo_ahorro,
+      cms_fondo_ahorro_libre: operacion.cms_fondo_ahorro_libre,
+      cms_hector: operacion.cms_hector,
+      cms_kuri: operacion.cms_kuri
+    };
+
+    // Recalcular las comisiones
+    const comisionesCalculadas = await Operacion.recalcularComisiones(id);
+    
+    // Obtener la operación actualizada
+    const operacionActualizada = await Operacion.findById(id);
+
+    res.json({
+      message: 'Comisiones recalculadas exitosamente',
+      comisiones_anteriores: comisionesAnteriores,
+      comisiones_nuevas: comisionesCalculadas,
+      operacion: operacionActualizada
+    });
+  } catch (error) {
+    console.error('Error al recalcular comisiones:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron recalcular las comisiones'
+    });
+  }
+};
+
+// Obtener operaciones no completamente pagadas
+exports.getOperacionesNoCompletamentePagadas = async (req, res) => {
+  try {
+    const operaciones = await Operacion.findNoCompletamentePagadas();
+    res.json(operaciones);
+  } catch (error) {
+    console.error('Error al obtener operaciones no completamente pagadas:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudieron obtener las operaciones no completamente pagadas'
     });
   }
 }; 

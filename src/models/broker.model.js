@@ -87,7 +87,79 @@ class Broker {
     }
   }
 
-  // Eliminar métodos relacionados con porcentaje
+  // Obtener todos los brokers con su saldo (suma de comisiones pendientes)
+  static async findAllWithSaldo() {
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          b.*,
+          COALESCE(SUM(cb.comision), 0) as saldo_pendiente
+        FROM broker b
+        LEFT JOIN comision_broker cb ON b.id = cb.id_broker AND cb.estatus = 'PENDIENTE'
+        GROUP BY b.id
+        ORDER BY b.id DESC
+      `);
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Obtener un broker por ID con su saldo
+  static async findByIdWithSaldo(id) {
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          b.*,
+          COALESCE(SUM(cb.comision), 0) as saldo_pendiente
+        FROM broker b
+        LEFT JOIN comision_broker cb ON b.id = cb.id_broker AND cb.estatus = 'PENDIENTE'
+        WHERE b.id = ?
+        GROUP BY b.id
+      `, [id]);
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Buscar brokers por nombre con saldo
+  static async searchByNameWithSaldo(searchTerm) {
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          b.*,
+          COALESCE(SUM(cb.comision), 0) as saldo_pendiente
+        FROM broker b
+        LEFT JOIN comision_broker cb ON b.id = cb.id_broker AND cb.estatus = 'PENDIENTE'
+        WHERE b.nombre LIKE ?
+        GROUP BY b.id
+        ORDER BY b.id DESC
+      `, [`%${searchTerm}%`]);
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Buscar brokers por letra con saldo
+  static async findByLetterWithSaldo(letter) {
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          b.*,
+          COALESCE(SUM(cb.comision), 0) as saldo_pendiente
+        FROM broker b
+        LEFT JOIN comision_broker cb ON b.id = cb.id_broker AND cb.estatus = 'PENDIENTE'
+        WHERE b.nombre LIKE ?
+        GROUP BY b.id
+        ORDER BY b.id DESC
+      `, [`${letter.toUpperCase()}%`]);
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = Broker; 

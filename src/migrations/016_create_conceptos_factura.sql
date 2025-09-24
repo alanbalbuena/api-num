@@ -5,8 +5,10 @@ CREATE TABLE IF NOT EXISTS conceptos_factura (
   descripcion VARCHAR(500) NOT NULL,
   clave_sat VARCHAR(20) NOT NULL,
   clave_unidad VARCHAR(10) NOT NULL,
-  cantidad DECIMAL(10,4) NOT NULL,
-  precio_unitario DECIMAL(10,2) NOT NULL,
+  cantidad DECIMAL(10,4) NOT NULL,  
+  precio DECIMAL(10,2) NOT NULL,
+  check_con_iva BOOLEAN DEFAULT true,
+  precio_unitario DECIMAL(10,2) NOT NULL, 
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (id_operacion) REFERENCES operaciones(id) ON DELETE CASCADE

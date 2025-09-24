@@ -147,13 +147,27 @@
 
 | Método | Endpoint | Descripción | Roles Requeridos |
 |--------|----------|-------------|------------------|
-| `GET` | `/brokers` | Obtener todos los brokers | Autenticado |
-| `GET` | `/brokers/:id` | Obtener broker por ID | Autenticado |
+| `GET` | `/brokers` | Obtener todos los brokers (incluye saldo pendiente) | Autenticado |
+| `GET` | `/brokers/:id` | Obtener broker por ID (incluye saldo pendiente) | Autenticado |
 | `GET` | `/brokers/porcentaje-range` | Obtener brokers por rango de porcentaje | Autenticado |
-| `GET` | `/brokers/letter/:letter` | Buscar brokers por letra | Autenticado |
+| `GET` | `/brokers/letter/:letter` | Buscar brokers por letra (incluye saldo pendiente) | Autenticado |
 | `POST` | `/brokers` | Crear nuevo broker | `ADMINISTRACION` |
 | `PUT` | `/brokers/:id` | Actualizar broker | `ADMINISTRACION` |
 | `DELETE` | `/brokers/:id` | Eliminar broker | `ADMINISTRACION` |
+
+**Ejemplo de respuesta con saldo pendiente:**
+```json
+{
+  "id": 1,
+  "nombre": "Broker Ejemplo",
+  "saldo_pendiente": 15000.50
+}
+```
+
+**Nota sobre el saldo pendiente:**
+- El campo `saldo_pendiente` representa la suma total de todas las comisiones en estado `PENDIENTE` para ese broker
+- Se calcula automáticamente en tiempo real
+- Si el broker no tiene comisiones pendientes, el saldo será `0`
 
 ---
 
@@ -164,12 +178,44 @@
 | Método | Endpoint | Descripción | Roles Requeridos |
 |--------|----------|-------------|------------------|
 | `GET` | `/operaciones` | Obtener todas las operaciones | Autenticado |
+| `GET` | `/operaciones/no-completamente-pagadas` | Obtener operaciones con saldo pendiente (saldo > 0) | Autenticado |
 | `GET` | `/operaciones/:id` | Obtener operación por ID (incluye conceptos de factura y razón social) | Autenticado |
 | `POST` | `/operaciones` | Crear nueva operación (con soporte para imagen, conceptos de factura y comisiones de broker automáticas) | `ADMINISTRACION`, `FACTURACION` |
 | `PUT` | `/operaciones/:id` | Actualizar operación (con soporte para imagen) | `ADMINISTRACION`, `FACTURACION` |
 | `DELETE` | `/operaciones/:id` | Eliminar operación | `ADMINISTRACION` |
 | `POST` | `/operaciones/:id/imagen` | Subir imagen para una operación | `ADMINISTRACION`, `FACTURACION` |
 | `DELETE` | `/operaciones/:id/imagen` | Eliminar imagen de una operación | `ADMINISTRACION`, `FACTURACION` |
+| `POST` | `/operaciones/:id/recalcular-saldo` | Recalcular saldo de una operación | `ADMINISTRACION`, `FACTURACION` |
+
+**Endpoint especial: Operaciones no completamente pagadas**
+- **URL:** `GET /api/operaciones/no-completamente-pagadas`
+- **Descripción:** Obtiene todas las operaciones que tienen saldo pendiente (saldo > 0)
+- **Respuesta:** Array directo de operaciones con información completa incluyendo nombres de cliente, empresa y brokers
+- **Ejemplo de respuesta:**
+```json
+[
+  {
+    "id": 1,
+    "numero_operacion": "OP001",
+    "deposito": 50000.00,
+    "saldo": 15000.00,
+    "nombre_cliente": "Cliente Ejemplo",
+    "nombre_empresa": "Empresa Ejemplo",
+    "fecha_operacion": "2024-01-15",
+    "estatus": "PENDIENTE"
+  },
+  {
+    "id": 2,
+    "numero_operacion": "OP002",
+    "deposito": 30000.00,
+    "saldo": 5000.00,
+    "nombre_cliente": "Otro Cliente",
+    "nombre_empresa": "Otra Empresa",
+    "fecha_operacion": "2024-01-16",
+    "estatus": "PENDIENTE"
+  }
+]
+```
 
 **Notas sobre imágenes:**
 - Las imágenes se almacenan en la carpeta `uploads/` del servidor
@@ -253,7 +299,7 @@
         "id_operacion": 1,
         "comision": 2500.00,
         "estatus": "PENDIENTE",
-        "metodo_pago": "TRANSFERENCIA",
+        "metodo_pago": null,
         "nombre_broker": "Broker 1"
       },
       {
@@ -262,7 +308,7 @@
         "id_operacion": 1,
         "comision": 1500.00,
         "estatus": "PENDIENTE",
-        "metodo_pago": "TRANSFERENCIA",
+        "metodo_pago": null,
         "nombre_broker": "Broker 2"
       }
     ]
@@ -276,7 +322,7 @@
   - Si `costo = 'SUBTOTAL'`: `((deposito / 1.16) * porcentaje_esquema) * porcentaje_broker`
 - Se crean solo si hay `deposito > 0` y `porcentaje_broker > 0`
 - Estado inicial: `PENDIENTE`
-- Método de pago inicial: `TRANSFERENCIA`
+- Método de pago inicial: `null` (se debe asignar posteriormente)
 - Se crean para broker1, broker2 y broker3 según corresponda
 
 ---
@@ -535,9 +581,68 @@
 | `GET` | `/retornos/operacion/:idOperacion` | Obtener retornos por operación | Autenticado |
 | `GET` | `/retornos/estadisticas/operacion/:idOperacion` | Obtener estadísticas por operación | Autenticado |
 | `GET` | `/retornos/fechas/rango` | Obtener retornos por rango de fechas | Autenticado |
-| `POST` | `/retornos` | Crear nuevo retorno | `ADMINISTRACION`, `FACTURACION` |
-| `PUT` | `/retornos/:id` | Actualizar retorno | `ADMINISTRACION`, `FACTURACION` |
+| `POST` | `/retornos` | Crear nuevo retorno (con soporte para imagen de comprobante) | `ADMINISTRACION`, `FACTURACION` |
+| `PUT` | `/retornos/:id` | Actualizar retorno (con soporte para imagen de comprobante) | `ADMINISTRACION`, `FACTURACION` |
 | `DELETE` | `/retornos/:id` | Eliminar retorno | `ADMINISTRACION` |
+
+**Campos del retorno:**
+- `id_operacion` (requerido): ID de la operación relacionada
+- `fecha_pago` (requerido): Fecha del pago (YYYY-MM-DD)
+- `monto_pagado` (requerido): Monto pagado (decimal positivo)
+- `metodo_pago` (requerido): Método de pago - `EFECTIVO`, `TRANSFERENCIA`, `CHEQUE`, `TARJETA`, `DEPOSITO`
+- `referencia` (opcional): Referencia o número de comprobante de pago
+- `imagen` (opcional): Archivo de imagen del comprobante de pago
+
+**Notas sobre imágenes de comprobante:**
+- Las imágenes se almacenan en la carpeta `uploads/` del servidor
+- Se sirven estáticamente en `/uploads/` 
+- Formatos permitidos: JPG, PNG, GIF, WebP
+- Tamaño máximo: 5MB
+- **La API asigna automáticamente la ruta de la imagen** - el usuario solo envía el archivo
+
+**Crear/Actualizar retorno con imagen:**
+- **Content-Type:** `multipart/form-data`
+- **Campos:** Todos los campos de retorno + `imagen` (opcional)
+- **Ejemplo:**
+  ```bash
+  curl -X POST \
+    http://localhost:3000/api/retornos \
+    -H "Authorization: Bearer YOUR_TOKEN" \
+    -F "id_operacion=1" \
+    -F "fecha_pago=2024-01-15" \
+    -F "monto_pagado=5000.00" \
+    -F "metodo_pago=TRANSFERENCIA" \
+    -F "referencia=TRF123456789" \
+    -F "imagen=@/path/to/comprobante.jpg"
+  ```
+
+**Ejemplo de creación de retorno:**
+```json
+{
+  "id_operacion": 1,
+  "fecha_pago": "2024-01-15",
+  "monto_pagado": 5000.00,
+  "metodo_pago": "TRANSFERENCIA",
+  "referencia": "TRF123456789"
+}
+```
+
+**Ejemplo de respuesta:**
+```json
+{
+  "message": "Retorno creado exitosamente",
+  "retorno": {
+    "id_retorno": 1,
+    "id_operacion": 1,
+    "fecha_pago": "2024-01-15",
+    "monto_pagado": 5000.00,
+    "metodo_pago": "TRANSFERENCIA",
+    "referencia": "TRF123456789",
+    "comprobante_pago": "/uploads/comprobante-123456789.jpg",
+    "fecha_creacion": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
 
 ---
 

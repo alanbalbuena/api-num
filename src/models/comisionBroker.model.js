@@ -241,14 +241,162 @@ class ComisionBroker {
     }
   }
 
-  // Obtener comisiones por rango de fechas
-  static async findByRangoFechas(fechaInicio, fechaFin) {
+  // Obtener estadísticas de comisiones por período
+  static async getStatsByPeriod(fecha_desde, fecha_hasta, id_broker = null) {
     try {
-      const [rows] = await db.query(`
-        SELECT * FROM comision_broker
+      let query = `
+        SELECT 
+          COUNT(*) as total_comisiones,
+          COUNT(DISTINCT id_broker) as total_brokers,
+          COUNT(DISTINCT id_operacion) as total_operaciones,
+          SUM(CASE WHEN estatus = 'PENDIENTE' THEN 1 ELSE 0 END) as comisiones_pendientes,
+          SUM(CASE WHEN estatus = 'PAGADA' THEN 1 ELSE 0 END) as comisiones_pagadas,
+          SUM(CASE WHEN estatus = 'CANCELADA' THEN 1 ELSE 0 END) as comisiones_canceladas,
+          SUM(comision) as total_comision,
+          SUM(CASE WHEN estatus = 'PAGADA' THEN comision ELSE 0 END) as total_pagado,
+          SUM(CASE WHEN estatus = 'PENDIENTE' THEN comision ELSE 0 END) as total_pendiente,
+          SUM(CASE WHEN estatus = 'CANCELADA' THEN comision ELSE 0 END) as total_cancelado,
+          AVG(comision) as promedio_comision,
+          MIN(created_at) as fecha_primera,
+          MAX(created_at) as fecha_ultima
+        FROM comision_broker
         WHERE created_at BETWEEN ? AND ?
-        ORDER BY created_at DESC
-      `, [fechaInicio, fechaFin]);
+      `;
+      
+      const params = [fecha_desde, fecha_hasta];
+      
+      if (id_broker) {
+        query += ` AND id_broker = ?`;
+        params.push(id_broker);
+      }
+
+      const [rows] = await db.query(query, params);
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Obtener resumen de comisiones por broker
+  static async getResumenPorBroker(fecha_desde = null, fecha_hasta = null) {
+    try {
+      let query = `
+        SELECT 
+          b.id,
+          b.nombre as broker_nombre,
+          COUNT(cb.id) as total_comisiones,
+          SUM(cb.comision) as monto_total,
+          COUNT(CASE WHEN cb.estatus = 'PAGADA' THEN 1 END) as comisiones_pagadas,
+          COUNT(CASE WHEN cb.estatus = 'PENDIENTE' THEN 1 END) as comisiones_pendientes,
+          COUNT(CASE WHEN cb.estatus = 'CANCELADA' THEN 1 END) as comisiones_canceladas,
+          SUM(CASE WHEN cb.estatus = 'PAGADA' THEN cb.comision ELSE 0 END) as monto_pagado,
+          SUM(CASE WHEN cb.estatus = 'PENDIENTE' THEN cb.comision ELSE 0 END) as monto_pendiente,
+          AVG(cb.comision) as promedio_comision
+        FROM broker b
+        LEFT JOIN comision_broker cb ON b.id = cb.id_broker
+        WHERE 1=1
+      `;
+      
+      const params = [];
+
+      if (fecha_desde) {
+        query += ` AND cb.created_at >= ?`;
+        params.push(fecha_desde);
+      }
+
+      if (fecha_hasta) {
+        query += ` AND cb.created_at <= ?`;
+        params.push(fecha_hasta);
+      }
+
+      query += ` GROUP BY b.id, b.nombre ORDER BY monto_total DESC`;
+
+      const [rows] = await db.query(query, params);
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Obtener comisiones por estatus con filtros
+  static async findByEstatusWithFilters(estatus, filters = {}) {
+    try {
+      let query = `
+        SELECT cb.*, b.nombre as broker_nombre, o.numero_operacion
+        FROM comision_broker cb
+        LEFT JOIN broker b ON cb.id_broker = b.id
+        LEFT JOIN operaciones o ON cb.id_operacion = o.id
+        WHERE cb.estatus = ?
+      `;
+      
+      const params = [estatus];
+
+      // Aplicar filtros adicionales
+      if (filters.id_broker) {
+        query += ` AND cb.id_broker = ?`;
+        params.push(filters.id_broker);
+      }
+
+      if (filters.fecha_desde) {
+        query += ` AND cb.created_at >= ?`;
+        params.push(filters.fecha_desde);
+      }
+
+      if (filters.fecha_hasta) {
+        query += ` AND cb.created_at <= ?`;
+        params.push(filters.fecha_hasta);
+      }
+
+      if (filters.metodo_pago) {
+        query += ` AND cb.metodo_pago = ?`;
+        params.push(filters.metodo_pago);
+      }
+
+      query += ` ORDER BY cb.created_at DESC`;
+
+      if (filters.limit) {
+        query += ` LIMIT ?`;
+        params.push(filters.limit);
+        
+        if (filters.offset) {
+          query += ` OFFSET ?`;
+          params.push(filters.offset);
+        }
+      }
+
+      const [rows] = await db.query(query, params);
+      return rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Obtener comisiones pendientes de pago
+  static async findPendientesDePago(fecha_desde = null, fecha_hasta = null) {
+    try {
+      let query = `
+        SELECT cb.*, b.nombre as broker_nombre, o.numero_operacion
+        FROM comision_broker cb
+        LEFT JOIN broker b ON cb.id_broker = b.id
+        LEFT JOIN operaciones o ON cb.id_operacion = o.id
+        WHERE cb.estatus = 'PENDIENTE'
+      `;
+      
+      const params = [];
+
+      if (fecha_desde) {
+        query += ` AND cb.created_at >= ?`;
+        params.push(fecha_desde);
+      }
+
+      if (fecha_hasta) {
+        query += ` AND cb.created_at <= ?`;
+        params.push(fecha_hasta);
+      }
+
+      query += ` ORDER BY cb.created_at ASC`;
+
+      const [rows] = await db.query(query, params);
       return rows;
     } catch (error) {
       throw error;

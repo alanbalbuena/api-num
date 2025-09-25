@@ -328,18 +328,108 @@ class Factura {
         return result[0].length > 0;
     }
 
-    // Verificar si existe factura con UUID
-    static async existsByUuid(uuid, excludeId = null) {
-        let query = 'SELECT id FROM facturas WHERE uuid = ?';
-        const params = [uuid];
+    // Obtener estadísticas de facturas por período
+    static async getStatsByPeriod(fecha_desde, fecha_hasta, id_empresa = null) {
+        let query = `
+            SELECT 
+                COUNT(*) as total_facturas,
+                COUNT(CASE WHEN estado = 'PAGADA' THEN 1 END) as facturas_pagadas,
+                COUNT(CASE WHEN estado = 'PENDIENTE' THEN 1 END) as facturas_pendientes,
+                COUNT(CASE WHEN estado = 'CANCELADA' THEN 1 END) as facturas_canceladas,
+                SUM(total) as total_importe,
+                SUM(CASE WHEN estado = 'PAGADA' THEN total ELSE 0 END) as importe_pagado,
+                SUM(CASE WHEN estado = 'PENDIENTE' THEN total ELSE 0 END) as importe_pendiente,
+                AVG(total) as promedio_factura,
+                MIN(fecha_emision) as fecha_primera,
+                MAX(fecha_emision) as fecha_ultima
+            FROM facturas
+            WHERE fecha_emision BETWEEN ? AND ?
+        `;
         
-        if (excludeId) {
-            query += ' AND id != ?';
-            params.push(excludeId);
+        const params = [fecha_desde, fecha_hasta];
+        
+        if (id_empresa) {
+            query += ` AND id_empresa = ?`;
+            params.push(id_empresa);
         }
-        
+
         const result = await db.query(query, params);
-        return result[0].length > 0;
+        return result[0][0];
+    }
+
+    // Obtener facturas por estado
+    static async getByEstado(estado, limit = 50, offset = 0, filters = {}) {
+        let query = `
+            SELECT f.*, e.nombre as empresa_nombre
+            FROM facturas f
+            LEFT JOIN empresa e ON f.id_empresa = e.id
+            WHERE f.estado = ?
+        `;
+        
+        const params = [estado];
+
+        // Aplicar filtros adicionales
+        if (filters.id_empresa) {
+            query += ` AND f.id_empresa = ?`;
+            params.push(filters.id_empresa);
+        }
+
+        if (filters.fecha_desde) {
+            query += ` AND f.fecha_emision >= ?`;
+            params.push(filters.fecha_desde);
+        }
+
+        if (filters.fecha_hasta) {
+            query += ` AND f.fecha_emision <= ?`;
+            params.push(filters.fecha_hasta);
+        }
+
+        // Ordenar por fecha de emisión descendente
+        query += ` ORDER BY f.fecha_emision DESC, f.id DESC`;
+
+        // Aplicar límite y offset
+        query += ` LIMIT ? OFFSET ?`;
+        params.push(limit, offset);
+
+        const result = await db.query(query, params);
+        return result[0];
+    }
+
+    // Obtener resumen de facturación por empresa
+    static async getResumenPorEmpresa(fecha_desde = null, fecha_hasta = null) {
+        let query = `
+            SELECT 
+                e.id,
+                e.nombre as empresa_nombre,
+                COUNT(f.id) as total_facturas,
+                SUM(f.total) as monto_total,
+                COUNT(CASE WHEN f.estado = 'PAGADA' THEN 1 END) as facturas_pagadas,
+                COUNT(CASE WHEN f.estado = 'PENDIENTE' THEN 1 END) as facturas_pendientes,
+                COUNT(CASE WHEN f.estado = 'CANCELADA' THEN 1 END) as facturas_canceladas,
+                SUM(CASE WHEN f.estado = 'PAGADA' THEN f.total ELSE 0 END) as monto_pagado,
+                SUM(CASE WHEN f.estado = 'PENDIENTE' THEN f.total ELSE 0 END) as monto_pendiente,
+                AVG(f.total) as promedio_factura
+            FROM empresa e
+            LEFT JOIN facturas f ON e.id = f.id_empresa
+            WHERE 1=1
+        `;
+        
+        const params = [];
+
+        if (fecha_desde) {
+            query += ` AND f.fecha_emision >= ?`;
+            params.push(fecha_desde);
+        }
+
+        if (fecha_hasta) {
+            query += ` AND f.fecha_emision <= ?`;
+            params.push(fecha_hasta);
+        }
+
+        query += ` GROUP BY e.id, e.nombre ORDER BY monto_total DESC`;
+
+        const result = await db.query(query, params);
+        return result[0];
     }
 }
 
